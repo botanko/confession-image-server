@@ -63,7 +63,7 @@ async function generateConfessionImage(confessionText, timestamp) {
   // Calculate dimensions exactly like your Android app
   const dimensions = determineOptimalDimensions(confessionText);
   const effectiveMargin = calculateEffectiveMargin(confessionText);
-  const fontSize = findOptimalFontSize(confessionText, dimensions, effectiveMargin);
+  const fontSize = findOptimalFontSize(confessionText, dimensions, effectiveMargin, createCanvas);
   
   console.log('Image dimensions:', dimensions);
   console.log('Font size:', fontSize);
@@ -81,27 +81,27 @@ async function generateConfessionImage(confessionText, timestamp) {
   ctx.fillStyle = '#ffffff';
   ctx.font = `${fontSize}px Arial`;
   ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
+  ctx.textBaseline = 'top'; // Changed from 'middle' to 'top' for better control
   
   // Calculate text area with dynamic margins (exactly like Android)
   const textAreaWidth = dimensions.width - (effectiveMargin * 2);
   const textAreaHeight = dimensions.height - (effectiveMargin * 2);
   const centerX = dimensions.width / 2;
-  
-  // Word wrap and draw confession text with Android-style line spacing
-  const lines = wrapText(ctx, confessionText, textAreaWidth);
+    // Word wrap and draw confession text with Android-style line spacing
+  const lines = wrapText(ctx, confessionText, textAreaWidth, fontSize);
   
   // Calculate line spacing based on text length and font size (Android logic)
   const lineSpacing = calculateLineSpacing(confessionText, fontSize);
-  const totalTextHeight = lines.length * (fontSize + lineSpacing);
+  
+  // Calculate total text height like Android: (lines * fontSize) + ((lines-1) * lineSpacing)
+  const totalTextHeight = (lines.length * fontSize) + ((lines.length - 1) * lineSpacing);
   
   // Calculate vertical centering with better padding (Android logic)
   const availableHeight = dimensions.height - (effectiveMargin * 2);
-  const startY = effectiveMargin + Math.max(0, (availableHeight - totalTextHeight) / 2);
-  
+  const textY = effectiveMargin + Math.max(0, (availableHeight - totalTextHeight) / 2);  
   // Draw each line with proper spacing
   lines.forEach((line, index) => {
-    const y = startY + (index * (fontSize + lineSpacing)) + (fontSize / 2);
+    const y = textY + (index * (fontSize + lineSpacing));
     ctx.fillText(line, centerX, y);
   });
   
@@ -113,7 +113,7 @@ async function generateConfessionImage(confessionText, timestamp) {
   return canvas.toBuffer('image/png');
 }
 
-function findOptimalFontSize(text, dimensions, margin) {
+function findOptimalFontSize(text, dimensions, margin, createCanvas) {
   // Android font sizing logic - exact match
   const MIN_FONT_SIZE = 20;
   const MAX_FONT_SIZE = 96;
@@ -121,26 +121,58 @@ function findOptimalFontSize(text, dimensions, margin) {
   const EXTREME_TEXT_THRESHOLD = 1500;
   
   const charCount = text.length;
+  const maxWidth = dimensions.width - (margin * 2);
+  const maxHeight = dimensions.height - (margin * 2);
   
   // Start with size based on character count (Android logic)
-  let startSize;
+  let fontSize;
   if (charCount > EXTREME_TEXT_THRESHOLD) {
-    startSize = 48;
+    fontSize = 48;
   } else if (charCount > VERY_LONG_TEXT_THRESHOLD) {
-    startSize = 64;
-  } else if (charCount > 400) {
-    startSize = 72;
-  } else if (charCount > 200) {
-    startSize = 80;
+    fontSize = 64;
   } else {
-    startSize = MAX_FONT_SIZE;
+    fontSize = MAX_FONT_SIZE;
   }
   
-  return startSize; // Simplified for now
+  // Create a temporary canvas for text measurement
+  const tempCanvas = createCanvas(100, 100);
+  const tempCtx = tempCanvas.getContext('2d');
+    // Iteratively find the optimal font size (like Android)
+  while (fontSize >= MIN_FONT_SIZE) {
+    tempCtx.font = `${fontSize}px Arial`;
+    
+    // Calculate line spacing like Android
+    const lineSpacing = calculateLineSpacing(text, fontSize);
+    
+    // Wrap text and calculate required height
+    const lines = wrapText(tempCtx, text, maxWidth, fontSize);
+    
+    // Calculate total height: (number of lines * fontSize) + ((number of lines - 1) * lineSpacing)
+    // This matches Android's StaticLayout.height calculation
+    const totalTextHeight = (lines.length * fontSize) + ((lines.length - 1) * lineSpacing);
+    
+    // Add padding like Android (fontSize * 0.3f)
+    const requiredHeight = totalTextHeight + (fontSize * 0.3);
+    
+    if (requiredHeight <= maxHeight) {
+      return fontSize;
+    }
+    
+    // Use smaller decrements for fine-tuning (Android logic)
+    if (charCount > EXTREME_TEXT_THRESHOLD) {
+      fontSize -= 1; // Very fine adjustments for extreme text
+    } else if (charCount > VERY_LONG_TEXT_THRESHOLD) {
+      fontSize -= 2; // Fine adjustments for long text
+    } else {
+      fontSize -= 3; // Normal adjustments
+    }
+  }
+  
+  return MIN_FONT_SIZE;
 }
 
 function calculateLineSpacing(text, fontSize) {
-  // Android line spacing logic
+  // Android line spacing logic - these are ADDITIONAL spacing on top of font size
   const EXTREME_TEXT_THRESHOLD = 1500;
   const VERY_LONG_TEXT_THRESHOLD = 800;
   
