@@ -1,54 +1,59 @@
-const express = require('express');
-const { createCanvas, loadImage, registerFont } = require('canvas');
-const cors = require('cors');
-const helmet = require('helmet');
-const compression = require('compression');
+const { createCanvas } = require('canvas');
 
-const app = express();
-const PORT = process.env.PORT || 3000;
+export default async function handler(req, res) {
+  // Enable CORS
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-// Middleware
-app.use(helmet());
-app.use(compression());
-app.use(cors());
-app.use(express.json({ limit: '10mb' }));
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString() });
-});
-
-// Main image generation endpoint
-app.post('/generate-confession-image', async (req, res) => {
-  try {
-    const { confessionText, timestamp } = req.body;
-    
-    if (!confessionText) {
-      return res.status(400).json({ error: 'confessionText is required' });
-    }
-    
-    console.log('Generating image for confession:', confessionText.substring(0, 50) + '...');
-    
-    // Generate image using exact Android logic
-    const imageBuffer = await generateConfessionImage(confessionText, timestamp);
-    
-    // Return image as base64
-    const base64Image = imageBuffer.toString('base64');
-    
-    res.json({
-      success: true,
-      image: `data:image/png;base64,${base64Image}`,
-      timestamp: new Date().toISOString()
-    });
-    
-  } catch (error) {
-    console.error('Error generating image:', error);
-    res.status(500).json({ 
-      error: 'Failed to generate image',
-      details: error.message 
+  // Health check endpoint
+  if (req.method === 'GET') {
+    return res.status(200).json({ 
+      status: 'OK', 
+      timestamp: new Date().toISOString(),
+      service: 'Confession Image Generator on Vercel'
     });
   }
-});
+
+  // Main image generation endpoint
+  if (req.method === 'POST') {
+    try {
+      const { confessionText, timestamp } = req.body;
+      
+      if (!confessionText) {
+        return res.status(400).json({ error: 'confessionText is required' });
+      }
+      
+      console.log('Generating image for confession:', confessionText.substring(0, 50) + '...');
+      
+      // Generate image using exact Android logic
+      const imageBuffer = await generateConfessionImage(confessionText, timestamp);
+      
+      // Return image as base64
+      const base64Image = imageBuffer.toString('base64');
+      
+      return res.status(200).json({
+        success: true,
+        image: `data:image/png;base64,${base64Image}`,
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (error) {
+      console.error('Error generating image:', error);
+      return res.status(500).json({ 
+        error: 'Failed to generate image',
+        details: error.message 
+      });
+    }
+  }
+
+  return res.status(405).json({ error: 'Method not allowed' });
+}
 
 async function generateConfessionImage(confessionText, timestamp) {
   // Calculate dimensions exactly like your Android app
@@ -195,12 +200,3 @@ function wrapText(ctx, text, maxWidth, fontSize) {
   
   return lines;
 }
-
-// Start server
-app.listen(PORT, () => {
-  console.log(`🚀 Confession Image Generator Server running on port ${PORT}`);
-  console.log(`📷 Generate images at: POST /generate-confession-image`);
-  console.log(`❤️  Health check at: GET /health`);
-});
-
-module.exports = app;

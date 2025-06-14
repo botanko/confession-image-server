@@ -1,6 +1,6 @@
-# Confession Image Generator Server
+# Confession Image Generator API
 
-A Node.js backend service that generates confession images with exact styling matching the Android app.
+A serverless API deployed on Vercel that generates confession images matching the Android app's exact styling.
 
 ## Features
 - ✅ Exact dimension matching (1080x1080 square, 1080x1350 vertical)
@@ -10,11 +10,22 @@ A Node.js backend service that generates confession images with exact styling ma
 - ✅ Dark background (#1a1a1a) with white text
 - ✅ Margins and spacing matching Android app logic
 
-## API Endpoint
+## API Endpoints
 
-### POST /generate-confession-image
+### GET /api/generate-image
+Health check endpoint
+**Response:**
+```json
+{
+  "status": "OK",
+  "timestamp": "2024-01-15T10:30:00.000Z",
+  "service": "Confession Image Generator on Vercel"
+}
+```
 
-**Request Body:**
+### POST /api/generate-image
+Generate confession image
+**Request:**
 ```json
 {
   "confessionText": "Your confession text here...",
@@ -31,18 +42,14 @@ A Node.js backend service that generates confession images with exact styling ma
 }
 ```
 
-## Deployment
+## Deployment Instructions
 
-This service is designed to be deployed on free hosting platforms like Render.
-
-### Deploy to Render:
-1. Push this code to GitHub
-2. Connect GitHub repo to Render
-3. Deploy as Web Service with Node runtime
-4. Use `npm start` as start command
-
-### Health Check
-- GET `/health` - Returns server status
+1. **Fork/Clone this repository**
+2. **Connect to Vercel:**
+   - Go to [vercel.com](https://vercel.com)
+   - Import your GitHub repository
+   - Deploy automatically
+3. **Get your API URL:** `https://your-app-name.vercel.app`
 
 ## Local Development
 
@@ -51,4 +58,21 @@ npm install
 npm run dev
 ```
 
-Server runs on port 3000 (or PORT environment variable).
+Visit `http://localhost:3000/api/generate-image` for health check.
+
+## Usage in Google Apps Script
+
+Update your CONFIG:
+```javascript
+const CONFIG = {
+  IMAGE_SERVER_URL: 'https://your-app-name.vercel.app'
+};
+```
+
+## Vercel Free Tier
+- 100GB bandwidth/month
+- 1M function invocations/month
+- 10 second max execution time
+- No credit card required
+
+Perfect for confession automation needs!
