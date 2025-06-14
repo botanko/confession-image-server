@@ -71,26 +71,6 @@ export default function handler(req, res) {
         a:hover {
             text-decoration: underline;
         }
-        .test-button {
-            background: #00ff88;
-            color: #000;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-weight: bold;
-            margin: 10px 5px;
-        }
-        .test-button:hover {
-            background: #00cc66;
-        }
-        .test-results {
-            background: #1a1a1a;
-            padding: 15px;
-            border-radius: 8px;
-            margin: 10px 0;
-            min-height: 100px;
-        }
     </style>
 </head>
 <body>
@@ -104,7 +84,6 @@ export default function handler(req, res) {
         <p>Your Vercel deployment is working correctly. The API is ready to generate confession images that match your Android app's styling.</p>
         <p><strong>Deployed:</strong> ${new Date().toISOString()}</p>
         <p><strong>Status:</strong> <span class="success">Online</span></p>
-        <p><strong>Your API URL:</strong> <code>${req.headers.host ? `https://${req.headers.host}` : 'https://your-app.vercel.app'}</code></p>
     </div>
 
     <h2>🔗 API Endpoints</h2>
@@ -112,24 +91,28 @@ export default function handler(req, res) {
     <div class="endpoint">
         <div><span class="method">GET</span> /api/generate-image</div>
         <div>Health check endpoint</div>
-        <button class="test-button" onclick="testHealthCheck()">Test Health Check</button>
     </div>
     
     <div class="endpoint">
         <div><span class="method">POST</span> /api/generate-image</div>
         <div>Generate confession image</div>
-        <button class="test-button" onclick="testImageGeneration()">Test Image Generation</button>
     </div>
 
-    <div id="testResults" class="test-results" style="display: none;">
-        <h3>Test Results:</h3>
-        <pre id="resultText"></pre>
+    <h2>📝 Usage Example</h2>
+    <div class="code">
+POST /api/generate-image
+Content-Type: application/json
+
+{
+  "confessionText": "Your confession text here...",
+  "timestamp": "2024-01-15 10:30 AM"
+}
     </div>
 
     <h2>🎯 Next Steps</h2>
     <ol>
-        <li><strong>Copy this URL:</strong> <code>${req.headers.host ? `https://${req.headers.host}` : 'https://your-app.vercel.app'}</code></li>
-        <li><strong>Update your Google Apps Script CONFIG:</strong></li>
+        <li>Copy this URL: <code>${req.headers.host ? `https://${req.headers.host}` : 'https://your-app.vercel.app'}</code></li>
+        <li>Update your Google Apps Script CONFIG:</li>
     </ol>
     <div class="code">
 const CONFIG = {
@@ -145,65 +128,16 @@ const CONFIG = {
     <h2>🚀 Features</h2>
     <ul>
         <li>✅ Exact Android app styling match</li>
-        <li>✅ Dynamic font sizing based on text length</li>
-        <li>✅ Proper text wrapping and centering</li>
-        <li>✅ Timestamp in bottom-right corner</li>
-        <li>✅ Optimal Instagram dimensions (1080x1080, 1080x1350)</li>
-        <li>✅ Dark background (#1a1a1a) with white text</li>
+        <li>✅ Dynamic font sizing</li>
+        <li>✅ Proper text wrapping</li>
+        <li>✅ Timestamp in bottom-right</li>
+        <li>✅ Optimal dimensions (1080x1080, 1080x1350)</li>
         <li>✅ Free hosting on Vercel</li>
     </ul>
 
     <div class="footer">
         <p>Powered by <a href="https://vercel.com" target="_blank">Vercel</a> • Built for confession automation</p>
     </div>
-
-    <script>
-        async function testHealthCheck() {
-            const resultDiv = document.getElementById('testResults');
-            const resultText = document.getElementById('resultText');
-            
-            resultDiv.style.display = 'block';
-            resultText.textContent = 'Testing health check...';
-            
-            try {
-                const response = await fetch('/api/generate-image');
-                const data = await response.json();
-                resultText.textContent = JSON.stringify(data, null, 2);
-            } catch (error) {
-                resultText.textContent = 'Error: ' + error.message;
-            }
-        }
-
-        async function testImageGeneration() {
-            const resultDiv = document.getElementById('testResults');
-            const resultText = document.getElementById('resultText');
-            
-            resultDiv.style.display = 'block';
-            resultText.textContent = 'Testing image generation...';
-            
-            try {
-                const response = await fetch('/api/generate-image', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        confessionText: 'This is a test confession to verify the API is working correctly!',
-                        timestamp: new Date().toLocaleString()
-                    })
-                });
-                
-                const data = await response.json();
-                if (data.success) {
-                    resultText.textContent = 'Success! Image generated. Size: ' + Math.round(data.image.length / 1024) + ' KB';
-                } else {
-                    resultText.textContent = 'Error: ' + (data.error || 'Unknown error');
-                }
-            } catch (error) {
-                resultText.textContent = 'Error: ' + error.message;
-            }
-        }
-    </script>
 </body>
 </html>`;
 

@@ -1,4 +1,5 @@
-const { createCanvas } = require('canvas');
+// Import canvas - Vercel handles this automatically
+// const { createCanvas } = require('canvas');
 
 export default async function handler(req, res) {
   // Enable CORS
@@ -47,7 +48,7 @@ export default async function handler(req, res) {
       console.error('Error generating image:', error);
       return res.status(500).json({ 
         error: 'Failed to generate image',
-        details: error.message 
+        details: error.message
       });
     }
   }
@@ -56,6 +57,9 @@ export default async function handler(req, res) {
 }
 
 async function generateConfessionImage(confessionText, timestamp) {
+  // Dynamic import of canvas for Vercel compatibility
+  const { createCanvas } = await import('canvas');
+  
   // Calculate dimensions exactly like your Android app
   const dimensions = determineOptimalDimensions(confessionText);
   const effectiveMargin = calculateEffectiveMargin(confessionText);
