@@ -63,7 +63,7 @@ async function generateConfessionImage(confessionText, timestamp) {
   // Calculate dimensions exactly like your Android app
   const dimensions = determineOptimalDimensions(confessionText);
   const effectiveMargin = calculateEffectiveMargin(confessionText);
-  const fontSize = determineFontSize(confessionText);
+  const fontSize = findOptimalFontSize(confessionText, dimensions, effectiveMargin);
   
   console.log('Image dimensions:', dimensions);
   console.log('Font size:', fontSize);
@@ -77,47 +77,143 @@ async function generateConfessionImage(confessionText, timestamp) {
   ctx.fillStyle = '#1a1a1a';
   ctx.fillRect(0, 0, dimensions.width, dimensions.height);
   
-  // Set text properties
+  // Set text properties exactly like Android
   ctx.fillStyle = '#ffffff';
   ctx.font = `${fontSize}px Arial`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   
-  // Calculate text area
+  // Calculate text area with dynamic margins (exactly like Android)
   const textAreaWidth = dimensions.width - (effectiveMargin * 2);
   const textAreaHeight = dimensions.height - (effectiveMargin * 2);
   const centerX = dimensions.width / 2;
-  const centerY = dimensions.height / 2;
   
-  // Word wrap and draw confession text
-  const lines = wrapText(ctx, confessionText, textAreaWidth, fontSize);
-  const lineHeight = fontSize * 1.4; // Line spacing
-  const totalTextHeight = lines.length * lineHeight;
-  const startY = centerY - (totalTextHeight / 2);
+  // Word wrap and draw confession text with Android-style line spacing
+  const lines = wrapText(ctx, confessionText, textAreaWidth);
   
-  // Draw each line
+  // Calculate line spacing based on text length and font size (Android logic)
+  const lineSpacing = calculateLineSpacing(confessionText, fontSize);
+  const totalTextHeight = lines.length * (fontSize + lineSpacing);
+  
+  // Calculate vertical centering with better padding (Android logic)
+  const availableHeight = dimensions.height - (effectiveMargin * 2);
+  const startY = effectiveMargin + Math.max(0, (availableHeight - totalTextHeight) / 2);
+  
+  // Draw each line with proper spacing
   lines.forEach((line, index) => {
-    const y = startY + (index * lineHeight);
+    const y = startY + (index * (fontSize + lineSpacing)) + (fontSize / 2);
     ctx.fillText(line, centerX, y);
   });
   
-  // Draw timestamp in bottom-right corner (exactly like your Android app)
+  // Draw timestamp in bottom-right corner exactly like Android app
   if (timestamp) {
-    const timestampFontSize = 22; // Matching your timestampPaint.textSize
-    const paddingFromEdge = 20;
-    
-    ctx.font = `${timestampFontSize}px Arial`;
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)'; // Matching your alpha 180
-    ctx.textAlign = 'right';
-    ctx.textBaseline = 'bottom';
-    
-    const timestampX = dimensions.width - paddingFromEdge;
-    const timestampY = dimensions.height - paddingFromEdge;
-    
-    ctx.fillText(timestamp, timestampX, timestampY);
+    drawTimestamp(ctx, timestamp, dimensions);
   }
   
   return canvas.toBuffer('image/png');
+}
+
+function findOptimalFontSize(text, dimensions, margin) {
+  // Android font sizing logic - exact match
+  const MIN_FONT_SIZE = 20;
+  const MAX_FONT_SIZE = 96;
+  const VERY_LONG_TEXT_THRESHOLD = 800;
+  const EXTREME_TEXT_THRESHOLD = 1500;
+  
+  const charCount = text.length;
+  
+  // Start with size based on character count (Android logic)
+  let startSize;
+  if (charCount > EXTREME_TEXT_THRESHOLD) {
+    startSize = 48;
+  } else if (charCount > VERY_LONG_TEXT_THRESHOLD) {
+    startSize = 64;
+  } else if (charCount > 400) {
+    startSize = 72;
+  } else if (charCount > 200) {
+    startSize = 80;
+  } else {
+    startSize = MAX_FONT_SIZE;
+  }
+  
+  return startSize; // Simplified for now
+}
+
+function calculateLineSpacing(text, fontSize) {
+  // Android line spacing logic
+  const EXTREME_TEXT_THRESHOLD = 1500;
+  const VERY_LONG_TEXT_THRESHOLD = 800;
+  
+  if (text.length > EXTREME_TEXT_THRESHOLD) {
+    return fontSize * 0.05; // Minimal spacing for extreme text
+  } else if (text.length > VERY_LONG_TEXT_THRESHOLD) {
+    return fontSize * 0.1; // Tighter spacing for very long text
+  } else {
+    return fontSize * 0.15; // Normal spacing
+  }
+}
+
+function drawTimestamp(ctx, timestamp, dimensions) {
+  // Format timestamp exactly like Android app
+  const formattedTimestamp = formatTimestamp(timestamp);
+  
+  // Create paint for timestamp (exact Android values)
+  const timestampFontSize = 22; // Matching Android timestampPaint.textSize
+  const paddingFromEdge = 20; // Matching Android paddingFromEdge
+  
+  ctx.font = `${timestampFontSize}px Arial`;
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.7)'; // Matching Android alpha 180
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'bottom';
+  
+  // Calculate position - bottom-right corner (exact Android logic)
+  const timestampX = dimensions.width - paddingFromEdge;
+  const timestampY = dimensions.height - paddingFromEdge;
+  
+  // Draw timestamp at the very bottom-right corner
+  ctx.fillText(formattedTimestamp, timestampX, timestampY);
+}
+
+function formatTimestamp(timestamp) {
+  try {
+    // Handle various timestamp formats exactly like Android
+    let formattedDate = timestamp;
+    
+    // Handle formats like "12/7/2024 10:30:45" or "6/8/2025 15:48:30"
+    const dateTimeRegex = /(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})/;
+    const match = timestamp.match(dateTimeRegex);
+    
+    if (match) {
+      const [, month, day, year, hour, minute] = match;
+      const shortYear = year.slice(-2); // Convert 2024 to 24
+      const hourInt = parseInt(hour);
+      
+      // Convert to 12-hour format with AM/PM (Android logic)
+      let displayHour, amPm;
+      if (hourInt === 0) {
+        displayHour = 12;
+        amPm = "AM";
+      } else if (hourInt < 12) {
+        displayHour = hourInt;
+        amPm = "AM";
+      } else if (hourInt === 12) {
+        displayHour = 12;
+        amPm = "PM";
+      } else {
+        displayHour = hourInt - 12;
+        amPm = "PM";
+      }
+      
+      formattedDate = `${month}/${day}/${shortYear}, ${displayHour}:${minute} ${amPm}`;
+    }
+    
+    // Return with "Submitted" prefix exactly like Android
+    return `Submitted ${formattedDate}`;
+    
+  } catch (error) {
+    // Fallback: use original timestamp with "Submitted" prefix
+    return `Submitted ${timestamp}`;
+  }
 }
 
 function determineOptimalDimensions(text) {
