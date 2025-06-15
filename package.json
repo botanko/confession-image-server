@@ -1,0 +1,29 @@
+{
+  "name": "confession-image-api",
+  "version": "1.0.0",
+  "description": "Serverless confession image generator for Vercel",
+  "main": "api/generate-image.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel"
+  },
+  "dependencies": {
+    "chrome-aws-lambda": "^10.1.0",
+    "puppeteer-core": "^21.5.2"
+  },
+  "engines": {
+    "node": "18.x"
+  },
+  "keywords": [
+    "vercel",
+    "serverless",
+    "image-generation",
+    "confession",
+    "canvas"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/botanko/confession-image-server.git"
+  },
+  "license": "MIT"
+}
