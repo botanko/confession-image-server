@@ -1,0 +1,33 @@
+{
+  "functions": {
+    "api/generate-image.js": {
+      "maxDuration": 10
+    },
+    "api/automation-control.js": {
+      "maxDuration": 30
+    },
+    "api/automation-status.js": {
+      "maxDuration": 10
+    },
+    "api/manual-post.js": {
+      "maxDuration": 30
+    },
+    "api/test-connection.js": {
+      "maxDuration": 15
+    },
+    "api/pending-confessions.js": {
+      "maxDuration": 15
+    }
+  },
+  "regions": ["iad1"],
+  "routes": [
+    {
+      "src": "/",
+      "dest": "/index.html"
+    },
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
+    }
+  ]
+}
