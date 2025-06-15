@@ -34,24 +34,27 @@ export default async function handler(req, res) {
       }
       
       console.log('Generating image for confession:', confessionText.substring(0, 50) + '...');
-        // Generate image using exact Android logic, now returns PNG buffer
-      const imageBufferPng = await generateConfessionImage(confessionText, timestamp);
       
-      // NEW: Upload the PNG image buffer to Vercel Blob
-      const imageName = `confessions/image-${Date.now()}.png`; // Unique name with .png extension
-      const blob = await put(imageName, imageBufferPng, {
+      // Generate image using exact Android logic, now returns JPEG buffer
+      const imageBufferJpeg = await generateConfessionImage(confessionText, timestamp);
+      
+      // NEW: Upload the JPEG image buffer to Vercel Blob
+      const imageName = `confessions/image-${Date.now()}.jpg`; // Unique name with .jpg extension
+      const blob = await put(imageName, imageBufferJpeg, {
         access: 'public', // Make it publicly accessible
-        contentType: 'image/png', // Set correct content type for PNG
+        contentType: 'image/jpeg', // Set correct content type for JPEG
         // Consider adding cache control for optimization if needed:
         // cacheControl: 'public, max-age=31536000, immutable', 
       });
-      // blob.url will contain the public URL      // Return public URL and (optional) base64 of the PNG
-      const base64Image = imageBufferPng.toString('base64');
+      // blob.url will contain the public URL
+
+      // Return public URL and (optional) base64 of the JPEG
+      const base64Image = imageBufferJpeg.toString('base64');
       
       return res.status(200).json({
         success: true,
         publicImageUrl: blob.url, // The direct public URL from Vercel Blob
-        imageBase64: `data:image/png;base64,${base64Image}`, // Base64 of the PNG
+        imageBase64: `data:image/jpeg;base64,${base64Image}`, // Base64 of the JPEG
         timestamp: new Date().toISOString()
       });
       
@@ -88,7 +91,8 @@ async function generateConfessionImage(confessionText, timestamp) {
   // Create canvas with exact dimensions
   const canvas = createCanvas(dimensions.width, dimensions.height);
   const ctx = canvas.getContext('2d');
-    // Set background color (important for PNG transparency, but we'll use solid background)
+  
+  // Set background color (important for JPEG as it doesn't support transparency)
   ctx.fillStyle = '#1a1a1a';
   ctx.fillRect(0, 0, dimensions.width, dimensions.height);
   
@@ -125,9 +129,11 @@ async function generateConfessionImage(confessionText, timestamp) {
   if (timestamp) {
     drawTimestamp(ctx, timestamp, dimensions);
   }
-    // MODIFIED: Convert canvas to PNG buffer using @napi-rs/canvas's encode method
-  // PNG is lossless and better for text-based images (smaller file size)
-  return await canvas.encode('png');
+  
+  // MODIFIED: Convert canvas to JPEG buffer using @napi-rs/canvas's encode method
+  // Quality is an integer from 0-100 (higher is better quality, larger file)
+  const quality = 90; 
+  return await canvas.encode('jpeg', quality);
 }
 
 function findOptimalFontSize(text, dimensions, margin, createCanvas) {
