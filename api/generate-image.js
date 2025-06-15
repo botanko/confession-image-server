@@ -85,12 +85,12 @@ async function generateConfessionImage(confessionText, timestamp) {
   console.log('Image dimensions:', dimensions);
   console.log('Font size:', fontSize);
   console.log('Margin:', effectiveMargin);
-    // Create canvas with exact dimensions (match Android exactly)
+  // Create canvas exactly like Android with optimized settings
   const canvas = createCanvas(dimensions.width, dimensions.height);
   const ctx = canvas.getContext('2d');
   
-  // Set canvas properties for optimal compression
-  canvas.quality = 'fast'; // Optimize for smaller file sizes
+  // Configure canvas for PNG optimization (like Android's bitmap settings)
+  canvas.format = 'png'; // Hint to canvas library for PNG optimization
     // Set background color (important for PNG transparency, but we'll use solid background)
   ctx.fillStyle = '#1a1a1a';
   ctx.fillRect(0, 0, dimensions.width, dimensions.height);  // Set text properties for good quality and readability while optimizing file size
@@ -130,19 +130,21 @@ async function generateConfessionImage(confessionText, timestamp) {
   // Draw timestamp in bottom-right corner exactly like Android app
   if (timestamp) {
     drawTimestamp(ctx, timestamp, dimensions);
-  }  // Balance quality and file size to achieve ~150KB target like Android
-  // Try different compression options focusing on quality while keeping size reasonable
+  }  // Use PNG like Android but with optimized settings to match 150KB target
+  // Android achieves small PNG files through native optimizations we need to replicate
   const compressionOptions = [
-    { format: 'jpeg', quality: 0.85 },  // High quality JPEG - should give good text readability
-    { format: 'jpeg', quality: 0.8 },   // Good quality JPEG 
-    { format: 'jpeg', quality: 0.75 },  // Decent quality JPEG
-    { format: 'png', level: 9, palette: true }, // PNG as fallback for text quality
+    // PNG with different optimization strategies to match Android's efficiency
+    { format: 'png', level: 9, palette: true, filters: 4 },    // Maximum compression with adaptive filtering
+    { format: 'png', level: 8, palette: true, filters: 0 },    // High compression with no filtering
+    { format: 'png', level: 6, palette: false, filters: 1 },   // Medium compression, no palette
+    // High quality JPEG as backup
+    { format: 'jpeg', quality: 0.9 },  // Very high quality JPEG
+    { format: 'jpeg', quality: 0.85 }, // High quality JPEG
   ];
   
   let bestBuffer = null;
-  let bestSize = Infinity;
   let bestOptions = null;
-  let targetSize = 150 * 1024; // 150KB target
+  let targetSize = 150 * 1024; // 150KB target like Android
   let closestToTarget = null;
   let closestDistance = Infinity;
   
@@ -150,52 +152,64 @@ async function generateConfessionImage(confessionText, timestamp) {
     try {
       let buffer;
       if (options.format === 'png') {
-        buffer = await canvas.encode('png', {
+        const pngOptions = {
           compressionLevel: options.level,
           palette: options.palette
-        });
+        };
+        // Add filters if supported
+        if (options.filters !== undefined) {
+          pngOptions.filters = options.filters;
+        }
+        buffer = await canvas.encode('png', pngOptions);
       } else {
-        // JPEG encoding with quality (0.0 to 1.0)
         buffer = await canvas.encode('jpeg', { quality: options.quality });
       }
       
       const sizeKB = Math.round(buffer.length/1024);
-      console.log(`${options.format.toUpperCase()} ${options.quality ? Math.round(options.quality*100)+'%' : 'level '+options.level}: ${sizeKB}KB`);
+      const qualityDesc = options.quality ? `${Math.round(options.quality*100)}%` : 
+                         `L${options.level}${options.palette ? '+palette' : ''}${options.filters !== undefined ? `+f${options.filters}` : ''}`;
       
-      // Find the option closest to 150KB target
+      console.log(`${options.format.toUpperCase()} ${qualityDesc}: ${sizeKB}KB`);
+      
+      // Find closest to Android's 150KB target
       const distanceFromTarget = Math.abs(buffer.length - targetSize);
       if (distanceFromTarget < closestDistance) {
         closestDistance = distanceFromTarget;
         closestToTarget = { buffer, options, size: buffer.length };
       }
       
-      // Also keep track of smallest size as backup
-      if (buffer.length < bestSize) {
-        bestSize = buffer.length;
+      // Keep track of smallest as backup
+      if (!bestBuffer || buffer.length < bestBuffer.length) {
         bestBuffer = buffer;
         bestOptions = options;
       }
       
     } catch (e) {
-      console.log(`Failed to encode with ${options.format}:`, e.message);
+      console.log(`Failed ${options.format}:`, e.message);
       continue;
     }
   }
   
-  // Use the option closest to 150KB target, or fallback to smallest if no good match
-  let selectedResult = closestToTarget || { buffer: bestBuffer, options: bestOptions, size: bestSize };
+  // Prefer the option closest to 150KB, with PNG priority if close
+  let selectedResult = closestToTarget;
   
-  // Fallback to high-quality JPEG if all compression attempts failed
+  // If no good match found, use the smallest
+  if (!selectedResult) {
+    selectedResult = { buffer: bestBuffer, options: bestOptions, size: bestBuffer.length };
+  }
+  
+  // Final fallback
   if (!selectedResult.buffer) {
-    selectedResult.buffer = await canvas.encode('jpeg', { quality: 0.8 });
-    selectedResult.options = { format: 'jpeg', quality: 0.8 };
+    selectedResult.buffer = await canvas.encode('png', { compressionLevel: 9, palette: true });
+    selectedResult.options = { format: 'png', level: 9, palette: true };
     selectedResult.size = selectedResult.buffer.length;
   }
   
-  const format = selectedResult.options.format || 'jpeg';
+  const format = selectedResult.options.format || 'png';
   const mimeType = format === 'png' ? 'image/png' : 'image/jpeg';
+  const targetDiff = Math.round((selectedResult.size - targetSize) / 1024);
   
-  console.log(`Selected: ${format.toUpperCase()} (targeting 150KB) - Actual: ${Math.round(selectedResult.size/1024)}KB`);
+  console.log(`Selected: ${format.toUpperCase()} - ${Math.round(selectedResult.size/1024)}KB (${targetDiff > 0 ? '+' : ''}${targetDiff}KB from 150KB target)`);
   
   return {
     buffer: selectedResult.buffer,
