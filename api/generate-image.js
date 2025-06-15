@@ -33,28 +33,26 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'confessionText is required' });
       }
       
-      console.log('Generating image for confession:', confessionText.substring(0, 50) + '...');
+      console.log('Generating image for confession:', confessionText.substring(0, 50) + '...');      // Generate image using exact Android logic, now returns optimized buffer
+      const imageResult = await generateConfessionImage(confessionText, timestamp);
       
-      // Generate image using exact Android logic, now returns JPEG buffer
-      const imageBufferJpeg = await generateConfessionImage(confessionText, timestamp);
-      
-      // NEW: Upload the JPEG image buffer to Vercel Blob
-      const imageName = `confessions/image-${Date.now()}.jpg`; // Unique name with .jpg extension
-      const blob = await put(imageName, imageBufferJpeg, {
+      // NEW: Upload the optimized image buffer to Vercel Blob
+      const imageName = `confessions/image-${Date.now()}.${imageResult.format}`; // Dynamic extension
+      const blob = await put(imageName, imageResult.buffer, {
         access: 'public', // Make it publicly accessible
-        contentType: 'image/jpeg', // Set correct content type for JPEG
+        contentType: imageResult.mimeType, // Dynamic content type
         // Consider adding cache control for optimization if needed:
         // cacheControl: 'public, max-age=31536000, immutable', 
       });
-      // blob.url will contain the public URL
-
-      // Return public URL and (optional) base64 of the JPEG
-      const base64Image = imageBufferJpeg.toString('base64');
+      // blob.url will contain the public URL      // Return public URL and (optional) base64 of the optimized image
+      const base64Image = imageResult.buffer.toString('base64');
       
       return res.status(200).json({
         success: true,
         publicImageUrl: blob.url, // The direct public URL from Vercel Blob
-        imageBase64: `data:image/jpeg;base64,${base64Image}`, // Base64 of the JPEG
+        imageBase64: `data:${imageResult.mimeType};base64,${base64Image}`, // Base64 with correct mime type
+        format: imageResult.format, // Include format info for client
+        fileSize: imageResult.buffer.length, // Include file size for debugging
         timestamp: new Date().toISOString()
       });
       
@@ -87,20 +85,24 @@ async function generateConfessionImage(confessionText, timestamp) {
   console.log('Image dimensions:', dimensions);
   console.log('Font size:', fontSize);
   console.log('Margin:', effectiveMargin);
-  
-  // Create canvas with exact dimensions
+    // Create canvas with exact dimensions (match Android exactly)
   const canvas = createCanvas(dimensions.width, dimensions.height);
   const ctx = canvas.getContext('2d');
   
-  // Set background color (important for JPEG as it doesn't support transparency)
+  // Set canvas properties for optimal compression
+  canvas.quality = 'fast'; // Optimize for smaller file sizes
+    // Set background color (important for PNG transparency, but we'll use solid background)
   ctx.fillStyle = '#1a1a1a';
   ctx.fillRect(0, 0, dimensions.width, dimensions.height);
-  
   // Set text properties exactly like Android
   ctx.fillStyle = '#ffffff';
-  ctx.font = `${fontSize}px Arial`; // Ensure Arial or a similar font is available in Vercel env
+  ctx.font = `${fontSize}px Arial`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
+  
+  // Optimize for smaller file sizes while maintaining quality (like Android)
+  ctx.imageSmoothingEnabled = true; // Keep smoothing for text quality
+  ctx.imageSmoothingQuality = 'medium'; // Balance between quality and file size
   
   // Calculate text area with dynamic margins (exactly like Android)
   const textAreaWidth = dimensions.width - (effectiveMargin * 2);
@@ -128,12 +130,51 @@ async function generateConfessionImage(confessionText, timestamp) {
   // Draw timestamp in bottom-right corner exactly like Android app
   if (timestamp) {
     drawTimestamp(ctx, timestamp, dimensions);
+  }  // Use PNG format only, exactly like Android app
+  // Android uses: bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
+  // Try different PNG compression levels to match Android's file size
+  const compressionOptions = [
+    { level: 9, palette: true },  // Maximum compression
+    { level: 8, palette: true },  // High compression
+    { level: 6, palette: true },  // Default compression
+    { level: 4, palette: false }, // Lower compression, no palette
+  ];
+  
+  let bestBuffer = null;
+  let bestSize = Infinity;
+  let bestOptions = null;
+  
+  for (const options of compressionOptions) {
+    try {
+      const buffer = await canvas.encode('png', {
+        compressionLevel: options.level,
+        palette: options.palette
+      });
+      
+      if (buffer.length < bestSize) {
+        bestSize = buffer.length;
+        bestBuffer = buffer;
+        bestOptions = options;
+      }
+    } catch (e) {
+      // Continue with next option if this one fails
+      continue;
+    }
   }
   
-  // MODIFIED: Convert canvas to JPEG buffer using @napi-rs/canvas's encode method
-  // Quality is an integer from 0-100 (higher is better quality, larger file)
-  const quality = 90; 
-  return await canvas.encode('jpeg', quality);
+  // Fallback to basic PNG if all compression attempts fail
+  if (!bestBuffer) {
+    bestBuffer = await canvas.encode('png');
+    bestOptions = { level: 'default', palette: false };
+  }
+  
+  console.log(`Generated PNG image with compression level ${bestOptions.level} and palette ${bestOptions.palette}: ${Math.round(bestBuffer.length/1024)}KB`);
+  
+  return {
+    buffer: bestBuffer,
+    format: 'png',
+    mimeType: 'image/png'
+  };
 }
 
 function findOptimalFontSize(text, dimensions, margin, createCanvas) {
