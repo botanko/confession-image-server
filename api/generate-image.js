@@ -132,7 +132,7 @@ async function generateConfessionImage(confessionText, timestamp) {
   
   // MODIFIED: Convert canvas to JPEG buffer using @napi-rs/canvas's encode method
   // Quality is an integer from 0-100 (higher is better quality, larger file)
-  const quality = 90; 
+  const quality = 75; 
   return await canvas.encode('jpeg', quality);
 }
 
