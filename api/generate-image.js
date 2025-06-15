@@ -93,16 +93,16 @@ async function generateConfessionImage(confessionText, timestamp) {
   canvas.quality = 'fast'; // Optimize for smaller file sizes
     // Set background color (important for PNG transparency, but we'll use solid background)
   ctx.fillStyle = '#1a1a1a';
-  ctx.fillRect(0, 0, dimensions.width, dimensions.height);  // Set text properties to match Android exactly with minimal complexity
+  ctx.fillRect(0, 0, dimensions.width, dimensions.height);  // Set text properties for good quality and readability while optimizing file size
   ctx.fillStyle = '#ffffff';
   ctx.font = `${fontSize}px Arial`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   
-  // Disable all smoothing and antialiasing to reduce file complexity (like Android)
-  ctx.imageSmoothingEnabled = false;
-  ctx.antialias = 'none';
-  ctx.textRenderingOptimization = 'optimizeSpeed';
+  // Enable text smoothing for better readability but optimize for file size
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high'; // High quality for text rendering
+  ctx.textRenderingOptimization = 'optimizeQuality'; // Prioritize text quality
   
   // Calculate text area with dynamic margins (exactly like Android)
   const textAreaWidth = dimensions.width - (effectiveMargin * 2);
@@ -130,18 +130,21 @@ async function generateConfessionImage(confessionText, timestamp) {
   // Draw timestamp in bottom-right corner exactly like Android app
   if (timestamp) {
     drawTimestamp(ctx, timestamp, dimensions);
-  }  // Switch to JPEG for better compression to match Android's smaller file sizes
-  // Even though Android uses PNG, the web canvas might need JPEG to achieve similar compression
+  }  // Balance quality and file size to achieve ~150KB target like Android
+  // Try different compression options focusing on quality while keeping size reasonable
   const compressionOptions = [
-    { format: 'jpeg', quality: 0.5 },  // 50% quality - very aggressive compression
-    { format: 'jpeg', quality: 0.6 },  // 60% quality
-    { format: 'jpeg', quality: 0.7 },  // 70% quality
-    { format: 'png', level: 9, palette: true }, // PNG as fallback
+    { format: 'jpeg', quality: 0.85 },  // High quality JPEG - should give good text readability
+    { format: 'jpeg', quality: 0.8 },   // Good quality JPEG 
+    { format: 'jpeg', quality: 0.75 },  // Decent quality JPEG
+    { format: 'png', level: 9, palette: true }, // PNG as fallback for text quality
   ];
   
   let bestBuffer = null;
   let bestSize = Infinity;
   let bestOptions = null;
+  let targetSize = 150 * 1024; // 150KB target
+  let closestToTarget = null;
+  let closestDistance = Infinity;
   
   for (const options of compressionOptions) {
     try {
@@ -156,13 +159,22 @@ async function generateConfessionImage(confessionText, timestamp) {
         buffer = await canvas.encode('jpeg', { quality: options.quality });
       }
       
+      const sizeKB = Math.round(buffer.length/1024);
+      console.log(`${options.format.toUpperCase()} ${options.quality ? Math.round(options.quality*100)+'%' : 'level '+options.level}: ${sizeKB}KB`);
+      
+      // Find the option closest to 150KB target
+      const distanceFromTarget = Math.abs(buffer.length - targetSize);
+      if (distanceFromTarget < closestDistance) {
+        closestDistance = distanceFromTarget;
+        closestToTarget = { buffer, options, size: buffer.length };
+      }
+      
+      // Also keep track of smallest size as backup
       if (buffer.length < bestSize) {
         bestSize = buffer.length;
         bestBuffer = buffer;
         bestOptions = options;
       }
-      
-      console.log(`${options.format.toUpperCase()} ${options.quality ? Math.round(options.quality*100)+'%' : 'level '+options.level}: ${Math.round(buffer.length/1024)}KB`);
       
     } catch (e) {
       console.log(`Failed to encode with ${options.format}:`, e.message);
@@ -170,19 +182,23 @@ async function generateConfessionImage(confessionText, timestamp) {
     }
   }
   
-  // Fallback to basic JPEG if all compression attempts fail
-  if (!bestBuffer) {
-    bestBuffer = await canvas.encode('jpeg', { quality: 0.6 });
-    bestOptions = { format: 'jpeg', quality: 0.6 };
+  // Use the option closest to 150KB target, or fallback to smallest if no good match
+  let selectedResult = closestToTarget || { buffer: bestBuffer, options: bestOptions, size: bestSize };
+  
+  // Fallback to high-quality JPEG if all compression attempts failed
+  if (!selectedResult.buffer) {
+    selectedResult.buffer = await canvas.encode('jpeg', { quality: 0.8 });
+    selectedResult.options = { format: 'jpeg', quality: 0.8 };
+    selectedResult.size = selectedResult.buffer.length;
   }
   
-  const format = bestOptions.format || 'jpeg';
+  const format = selectedResult.options.format || 'jpeg';
   const mimeType = format === 'png' ? 'image/png' : 'image/jpeg';
   
-  console.log(`Selected best compression: ${format.toUpperCase()} - ${Math.round(bestBuffer.length/1024)}KB`);
+  console.log(`Selected: ${format.toUpperCase()} (targeting 150KB) - Actual: ${Math.round(selectedResult.size/1024)}KB`);
   
   return {
-    buffer: bestBuffer,
+    buffer: selectedResult.buffer,
     format: format,
     mimeType: mimeType
   };
