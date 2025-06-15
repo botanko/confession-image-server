@@ -93,16 +93,16 @@ async function generateConfessionImage(confessionText, timestamp) {
   canvas.quality = 'fast'; // Optimize for smaller file sizes
     // Set background color (important for PNG transparency, but we'll use solid background)
   ctx.fillStyle = '#1a1a1a';
-  ctx.fillRect(0, 0, dimensions.width, dimensions.height);
-  // Set text properties exactly like Android
+  ctx.fillRect(0, 0, dimensions.width, dimensions.height);  // Set text properties to match Android exactly with minimal complexity
   ctx.fillStyle = '#ffffff';
   ctx.font = `${fontSize}px Arial`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   
-  // Optimize for smaller file sizes while maintaining quality (like Android)
-  ctx.imageSmoothingEnabled = true; // Keep smoothing for text quality
-  ctx.imageSmoothingQuality = 'medium'; // Balance between quality and file size
+  // Disable all smoothing and antialiasing to reduce file complexity (like Android)
+  ctx.imageSmoothingEnabled = false;
+  ctx.antialias = 'none';
+  ctx.textRenderingOptimization = 'optimizeSpeed';
   
   // Calculate text area with dynamic margins (exactly like Android)
   const textAreaWidth = dimensions.width - (effectiveMargin * 2);
@@ -130,14 +130,13 @@ async function generateConfessionImage(confessionText, timestamp) {
   // Draw timestamp in bottom-right corner exactly like Android app
   if (timestamp) {
     drawTimestamp(ctx, timestamp, dimensions);
-  }  // Use PNG format only, exactly like Android app
-  // Android uses: bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
-  // Try different PNG compression levels to match Android's file size
+  }  // Switch to JPEG for better compression to match Android's smaller file sizes
+  // Even though Android uses PNG, the web canvas might need JPEG to achieve similar compression
   const compressionOptions = [
-    { level: 9, palette: true },  // Maximum compression
-    { level: 8, palette: true },  // High compression
-    { level: 6, palette: true },  // Default compression
-    { level: 4, palette: false }, // Lower compression, no palette
+    { format: 'jpeg', quality: 0.5 },  // 50% quality - very aggressive compression
+    { format: 'jpeg', quality: 0.6 },  // 60% quality
+    { format: 'jpeg', quality: 0.7 },  // 70% quality
+    { format: 'png', level: 9, palette: true }, // PNG as fallback
   ];
   
   let bestBuffer = null;
@@ -146,34 +145,46 @@ async function generateConfessionImage(confessionText, timestamp) {
   
   for (const options of compressionOptions) {
     try {
-      const buffer = await canvas.encode('png', {
-        compressionLevel: options.level,
-        palette: options.palette
-      });
+      let buffer;
+      if (options.format === 'png') {
+        buffer = await canvas.encode('png', {
+          compressionLevel: options.level,
+          palette: options.palette
+        });
+      } else {
+        // JPEG encoding with quality (0.0 to 1.0)
+        buffer = await canvas.encode('jpeg', { quality: options.quality });
+      }
       
       if (buffer.length < bestSize) {
         bestSize = buffer.length;
         bestBuffer = buffer;
         bestOptions = options;
       }
+      
+      console.log(`${options.format.toUpperCase()} ${options.quality ? Math.round(options.quality*100)+'%' : 'level '+options.level}: ${Math.round(buffer.length/1024)}KB`);
+      
     } catch (e) {
-      // Continue with next option if this one fails
+      console.log(`Failed to encode with ${options.format}:`, e.message);
       continue;
     }
   }
   
-  // Fallback to basic PNG if all compression attempts fail
+  // Fallback to basic JPEG if all compression attempts fail
   if (!bestBuffer) {
-    bestBuffer = await canvas.encode('png');
-    bestOptions = { level: 'default', palette: false };
+    bestBuffer = await canvas.encode('jpeg', { quality: 0.6 });
+    bestOptions = { format: 'jpeg', quality: 0.6 };
   }
   
-  console.log(`Generated PNG image with compression level ${bestOptions.level} and palette ${bestOptions.palette}: ${Math.round(bestBuffer.length/1024)}KB`);
+  const format = bestOptions.format || 'jpeg';
+  const mimeType = format === 'png' ? 'image/png' : 'image/jpeg';
+  
+  console.log(`Selected best compression: ${format.toUpperCase()} - ${Math.round(bestBuffer.length/1024)}KB`);
   
   return {
     buffer: bestBuffer,
-    format: 'png',
-    mimeType: 'image/png'
+    format: format,
+    mimeType: mimeType
   };
 }
 
